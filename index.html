@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kana no Keiko — Hiragana, Katakana e Frases</title>
+
+<style>
+  :root{
+    --paper: #efe9d8;
+    --paper-card: #faf7ee;
+    --ink: #201d16;
+    --indigo: #2c3c58;
+    --indigo-deep: #17233a;
+    --hanko: #a8382c;
+    --moss: #4b7355;
+    --muted: #7d7462;
+    --line: rgba(32,29,22,0.14);
+    --radius: 6px;
+  }
+  *{ box-sizing: border-box; }
+  html, body{
+    margin:0; padding:0; height:100%;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body{
+    background-image:
+      radial-gradient(circle at 88% 8%, rgba(44,60,88,0.06), transparent 40%),
+      radial-gradient(circle at 6% 92%, rgba(168,56,44,0.05), transparent 38%);
+  }
+  #app{
+    min-height: 100vh;
+    display:flex; align-items:center; justify-content:center;
+    padding: 24px;
+    position: relative;
+  }
+
+  /* ---------- flash overlay ---------- */
+  #flash{
+    position: fixed; inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 50;
+    transition: opacity 90ms ease-out;
+  }
+  #flash.correct{ background: var(--moss); opacity: 0.28; }
+  #flash.wrong{ background: var(--hanko); opacity: 0.30; }
+  @media (prefers-reduced-motion: reduce){
+    #flash{ transition: none; }
+  }
+
+  /* ---------- menu screen ---------- */
+  .screen{ width: 100%; max-width: 460px; }
+  .enso{
+    position: absolute; top: -60px; right: -60px;
+    width: 220px; height: 220px;
+    border-radius: 50%;
+    border: 14px solid var(--indigo);
+    opacity: 0.08;
+    transform: rotate(-8deg);
+  }
+  .menu{ text-align:center; }
+  .menu .kanji-title{
+    font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+    font-weight: 700;
+    font-size: clamp(48px, 12vw, 72px);
+    color: var(--ink);
+    line-height: 1;
+    margin: 0 0 6px;
+  }
+  .menu .subtitle{
+    font-size: 15px;
+    color: var(--muted);
+    margin: 0 0 40px;
+    letter-spacing: 0.02em;
+  }
+  .menu-btn{
+    display:block;
+    width: 100%;
+    background: var(--paper-card);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--indigo);
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin-bottom: 14px;
+    text-align: left;
+    font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+    transition: transform 90ms ease, background 90ms ease;
+  }
+  .menu-btn:hover{ background: #fff; transform: translateX(2px); }
+  .menu-btn:focus-visible{ outline: 2px solid var(--indigo); outline-offset: 2px; }
+  .menu-btn .jp{
+    font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+    font-size: 22px;
+    margin-right: 12px;
+  }
+  .menu-btn .stat{
+    display:block;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-weight: 400;
+  }
+  .reset-link{
+    display:inline-block;
+    margin-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    background:none; border:none; font-family: inherit;
+  }
+  .reset-link:hover{ color: var(--hanko); }
+
+  /* ---------- game screen ---------- */
+  .game{ display:none; text-align:center; }
+  .game.active{ display:block; }
+  .menu.hidden{ display:none; }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom: 40px;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+  .back-btn{
+    background:none; border:none; cursor:pointer;
+    font-family: inherit; font-size: 13.5px; color: var(--indigo);
+    padding: 6px 0;
+    display:flex; align-items:center; gap:6px;
+  }
+  .back-btn:hover{ color: var(--hanko); }
+  .back-btn:focus-visible{ outline: 2px solid var(--indigo); outline-offset: 2px; }
+  .stats{ display:flex; gap:14px; }
+  .stats b{ color: var(--ink); font-weight: 700; }
+
+  .char-wrap{
+    height: clamp(160px, 32vw, 220px);
+    display:flex; align-items:center; justify-content:center;
+    margin-bottom: 44px;
+  }
+  #kana-char{
+    font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+    font-weight: 700;
+    font-size: clamp(110px, 26vw, 170px);
+    color: var(--ink);
+    line-height: 1;
+    user-select: none;
+  }
+
+  /* modo frases: caixa mais baixa, texto que quebra linha */
+  #game[data-mode="phrases"] .char-wrap{
+    height: auto;
+    min-height: 130px;
+    padding: 10px 6px;
+  }
+  #game[data-mode="phrases"] #kana-char{
+    font-size: clamp(22px, 5vw, 32px);
+    font-weight: 600;
+    line-height: 1.55;
+    white-space: normal;
+    max-width: 420px;
+  }
+  #kana-sub{
+    display: none;
+    font-size: 15px;
+    font-style: italic;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  #game[data-mode="phrases"] #kana-sub{
+    display: block;
+  }
+
+  .options{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 480px){
+    .options{ grid-template-columns: 1fr; }
+  }
+  #game[data-mode="phrases"] .options{
+    grid-template-columns: 1fr;
+  }
+  .opt{
+    position: relative;
+    background: var(--paper-card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px 10px 16px;
+    font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+    transition: transform 90ms ease, border-color 90ms ease;
+  }
+  #game[data-mode="phrases"] .opt{
+    text-align: left;
+    padding: 16px 16px 16px 34px;
+    font-size: 15.5px;
+    font-weight: 400;
+  }
+  #game[data-mode="phrases"] .opt .key{
+    top: 16px; left: 12px;
+  }
+  .opt:hover{ transform: translateY(-2px); border-color: var(--indigo); }
+  .opt:focus-visible{ outline: 2px solid var(--indigo); outline-offset: 2px; }
+  .opt .key{
+    position:absolute; top:6px; left:9px;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .hint{
+    margin-top: 28px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .footer-note{
+    text-align:center;
+    margin-top: 22px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+<style>
+#kana-char{line-height:1.15;text-align:center;}
+#kana-sub{max-width:900px;margin:10px auto 0;text-align:center;line-height:1.45;}
+.opt{font-size:clamp(1.4rem,3vw,2.2rem);}
+</style>
+</head>
+<body>
+<div id="flash"></div>
+<div id="app">
+  <div class="screen">
+    <div class="enso" aria-hidden="true"></div>
+
+    <!-- MENU -->
+    <div class="menu" id="menu">
+      <p class="kanji-title">仮名</p>
+      <p class="subtitle">Prática de hiragana e katakana — sem kanji</p>
+
+      <button class="menu-btn" data-set="hiragana">
+        <span class="jp">あ</span>Hiragana
+        <span class="stat" id="stat-hiragana">104 caracteres</span>
+      </button>
+      <button class="menu-btn" data-set="katakana">
+        <span class="jp">ア</span>Katakana
+        <span class="stat" id="stat-katakana">104 caracteres</span>
+      </button>
+      <button class="menu-btn" data-set="phrases">
+        <span class="jp">かいわ</span>Frases
+        <span class="stat" id="stat-phrases">100 frases do dia a dia</span>
+      </button>
+
+      <button class="reset-link" id="reset-btn">reiniciar progresso salvo</button>
+    </div>
+
+    <!-- GAME -->
+    <div class="game" id="game">
+      <div class="topbar">
+        <button class="back-btn" id="back-btn">&larr; voltar</button>
+        <div class="stats">
+          <span>sequência <b id="streak">0</b></span>
+          <span>acertos <b id="accuracy">—</b></span>
+        </div>
+      </div>
+
+      <div class="char-wrap">
+        <div id="kana-char">あ</div>
+        <div id="kana-sub"></div>
+      </div>
+
+      <div class="options" id="options">
+        <button class="opt" data-idx="0"><span class="key">1</span><span class="txt"></span></button>
+        <button class="opt" data-idx="1"><span class="key">2</span><span class="txt"></span></button>
+        <button class="opt" data-idx="2"><span class="key">3</span><span class="txt"></span></button>
+      </div>
+
+      <p class="hint">tecle 1, 2 ou 3 — ou use as setas ← ↓ →</p>
+      <p class="footer-note">os erros são lembrados: o que você mais erra volta a aparecer com mais frequência</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- kana data ----------
+  var HIRAGANA = [
+    ["あ","a"],["い","i"],["う","u"],["え","e"],["お","o"],
+    ["か","ka"],["き","ki"],["く","ku"],["け","ke"],["こ","ko"],
+    ["さ","sa"],["し","shi"],["す","su"],["せ","se"],["そ","so"],
+    ["た","ta"],["ち","chi"],["つ","tsu"],["て","te"],["と","to"],
+    ["な","na"],["に","ni"],["ぬ","nu"],["ね","ne"],["の","no"],
+    ["は","ha"],["ひ","hi"],["ふ","fu"],["へ","he"],["ほ","ho"],
+    ["ま","ma"],["み","mi"],["む","mu"],["め","me"],["も","mo"],
+    ["や","ya"],["ゆ","yu"],["よ","yo"],
+    ["ら","ra"],["り","ri"],["る","ru"],["れ","re"],["ろ","ro"],
+    ["わ","wa"],["を","wo"],["ん","n"],
+    ["が","ga"],["ぎ","gi"],["ぐ","gu"],["げ","ge"],["ご","go"],
+    ["ざ","za"],["じ","ji"],["ず","zu"],["ぜ","ze"],["ぞ","zo"],
+    ["だ","da"],["ぢ","ji"],["づ","zu"],["で","de"],["ど","do"],
+    ["ば","ba"],["び","bi"],["ぶ","bu"],["べ","be"],["ぼ","bo"],
+    ["ぱ","pa"],["ぴ","pi"],["ぷ","pu"],["ぺ","pe"],["ぽ","po"],
+    ["きゃ","kya"],["きゅ","kyu"],["きょ","kyo"],
+    ["しゃ","sha"],["しゅ","shu"],["しょ","sho"],
+    ["ちゃ","cha"],["ちゅ","chu"],["ちょ","cho"],
+    ["にゃ","nya"],["にゅ","nyu"],["にょ","nyo"],
+    ["ひゃ","hya"],["ひゅ","hyu"],["ひょ","hyo"],
+    ["みゃ","mya"],["みゅ","myu"],["みょ","myo"],
+    ["りゃ","rya"],["りゅ","ryu"],["りょ","ryo"],
+    ["ぎゃ","gya"],["ぎゅ","gyu"],["ぎょ","gyo"],
+    ["じゃ","ja"],["じゅ","ju"],["じょ","jo"],
+    ["びゃ","bya"],["びゅ","byu"],["びょ","byo"],
+    ["ぴゃ","pya"],["ぴゅ","pyu"],["ぴょ","pyo"]
+  ];
+
+  var KATAKANA = [
+    ["ア","a"],["イ","i"],["ウ","u"],["エ","e"],["オ","o"],
+    ["カ","ka"],["キ","ki"],["ク","ku"],["ケ","ke"],["コ","ko"],
+    ["サ","sa"],["シ","shi"],["ス","su"],["セ","se"],["ソ","so"],
+    ["タ","ta"],["チ","chi"],["ツ","tsu"],["テ","te"],["ト","to"],
+    ["ナ","na"],["ニ","ni"],["ヌ","nu"],["ネ","ne"],["ノ","no"],
+    ["ハ","ha"],["ヒ","hi"],["フ","fu"],["ヘ","he"],["ホ","ho"],
+    ["マ","ma"],["ミ","mi"],["ム","mu"],["メ","me"],["モ","mo"],
+    ["ヤ","ya"],["ユ","yu"],["ヨ","yo"],
+    ["ラ","ra"],["リ","ri"],["ル","ru"],["レ","re"],["ロ","ro"],
+    ["ワ","wa"],["ヲ","wo"],["ン","n"],
+    ["ガ","ga"],["ギ","gi"],["グ","gu"],["ゲ","ge"],["ゴ","go"],
+    ["ザ","za"],["ジ","ji"],["ズ","zu"],["ゼ","ze"],["ゾ","zo"],
+    ["ダ","da"],["ヂ","ji"],["ヅ","zu"],["デ","de"],["ド","do"],
+    ["バ","ba"],["ビ","bi"],["ブ","bu"],["ベ","be"],["ボ","bo"],
+    ["パ","pa"],["ピ","pi"],["プ","pu"],["ペ","pe"],["ポ","po"],
+    ["キャ","kya"],["キュ","kyu"],["キョ","kyo"],
+    ["シャ","sha"],["シュ","shu"],["ショ","sho"],
+    ["チャ","cha"],["チュ","chu"],["チョ","cho"],
+    ["ニャ","nya"],["ニュ","nyu"],["ニョ","nyo"],
+    ["ヒャ","hya"],["ヒュ","hyu"],["ヒョ","hyo"],
+    ["ミャ","mya"],["ミュ","myu"],["ミョ","myo"],
+    ["リャ","rya"],["リュ","ryu"],["リョ","ryo"],
+    ["ギャ","gya"],["ギュ","gyu"],["ギョ","gyo"],
+    ["ジャ","ja"],["ジュ","ju"],["ジョ","jo"],
+    ["ビャ","bya"],["ビュ","byu"],["ビョ","byo"],
+    ["ピャ","pya"],["ピュ","pyu"],["ピョ","pyo"]
+  ];
+
+  var PHRASES = [
+    // ---- 50 expressões e frases básicas do dia a dia ----
+    ["おはようございます。","Ohayou gozaimasu.","Bom dia."],
+    ["こんにちは。","Konnichiwa.","Boa tarde. / Olá."],
+    ["こんばんは。","Konbanwa.","Boa noite. (ao chegar/cumprimentar)"],
+    ["おやすみなさい。","Oyasuminasai.","Boa noite. (ao dormir)"],
+    ["さようなら。","Sayounara.","Adeus."],
+    ["またね。","Mata ne.","Até mais."],
+    ["じゃあね。","Jaa ne.","Tchau, então."],
+    ["はじめまして。","Hajimemashite.","Prazer em conhecê-lo(a)."],
+    ["どうぞよろしく。","Douzo yoroshiku.","Um prazer, conte comigo."],
+    ["おなまえは？","Onamae wa?","Qual é o seu nome?"],
+    ["わたしのなまえはたろうです。","Watashi no namae wa Tarou desu.","Meu nome é Tarô."],
+    ["おげんきですか。","Ogenki desu ka?","Como você está?"],
+    ["げんきです。","Genki desu.","Estou bem."],
+    ["ありがとうございます。","Arigatou gozaimasu.","Muito obrigado."],
+    ["どういたしまして。","Dou itashimashite.","De nada."],
+    ["すみません。","Sumimasen.","Com licença. / Desculpe."],
+    ["ごめんなさい。","Gomennasai.","Me desculpe."],
+    ["だいじょうぶです。","Daijoubu desu.","Está tudo bem."],
+    ["おねがいします。","Onegaishimasu.","Por favor."],
+    ["どうぞ。","Douzo.","Por favor, pode ir. / Aqui está."],
+    ["いただきます。","Itadakimasu.","Vou comer. (antes da refeição)"],
+    ["ごちそうさまでした。","Gochisousama deshita.","Estava delicioso, obrigado. (depois de comer)"],
+    ["どこからきましたか。","Doko kara kimashita ka?","De onde você veio?"],
+    ["ブラジルからきました。","Burajiru kara kimashita.","Eu vim do Brasil."],
+    ["なんさいですか。","Nansai desu ka?","Quantos anos você tem?"],
+    ["にじゅうにさいです。","Nijuuni sai desu.","Tenho vinte e dois anos."],
+    ["しつれいします。","Shitsurei shimasu.","Com licença. (ao entrar ou sair)"],
+    ["おつかれさまでした。","Otsukaresama deshita.","Bom trabalho. (ao final do expediente)"],
+    ["いってきます。","Ittekimasu.","Já vou! (saindo de casa)"],
+    ["いってらっしゃい。","Itterasshai.","Vá com cuidado. (para quem sai)"],
+    ["ただいま。","Tadaima.","Cheguei!"],
+    ["おかえりなさい。","Okaerinasai.","Bem-vindo de volta."],
+    ["わかりました。","Wakarimashita.","Entendi."],
+    ["わかりません。","Wakarimasen.","Não entendo. / Não sei."],
+    ["もういちどおねがいします。","Mou ichido onegaishimasu.","Mais uma vez, por favor."],
+    ["ゆっくりおねがいします。","Yukkuri onegaishimasu.","Devagar, por favor."],
+    ["にほんごがすこしわかります。","Nihongo ga sukoshi wakarimasu.","Entendo um pouco de japonês."],
+    ["えいごがはなせますか。","Eigo ga hanasemasu ka?","Você fala inglês?"],
+    ["これはなんですか。","Kore wa nan desu ka?","O que é isso?"],
+    ["トイレはどこですか。","Toire wa doko desu ka?","Onde fica o banheiro?"],
+    ["いくらですか。","Ikura desu ka?","Quanto custa?"],
+    ["たすけてください。","Tasukete kudasai.","Me ajude, por favor."],
+    ["きをつけて。","Ki o tsukete.","Se cuide. / Tenha cuidado."],
+    ["おめでとうございます。","Omedetou gozaimasu.","Parabéns!"],
+    ["がんばってください。","Ganbatte kudasai.","Boa sorte! Esforce-se!"],
+    ["おだいじに。","Odaiji ni.","Melhoras. (para quem está doente)"],
+    ["たのしみです。","Tanoshimi desu.","Estou animado(a) com isso."],
+    ["ひさしぶりですね。","Hisashiburi desu ne.","Há quanto tempo!"],
+    ["あけましておめでとうございます。","Akemashite omedetou gozaimasu.","Feliz ano novo!"],
+    ["しあわせです。","Shiawase desu.","Estou feliz."],
+    // ---- 50 frases com verbos e ações do cotidiano ----
+    ["わたしはがっこうへいきます。","Watashi wa gakkou e ikimasu.","Eu vou para a escola."],
+    ["わたしはみずをのみます。","Watashi wa mizu o nomimasu.","Eu bebo água."],
+    ["わたしはごはんをたべます。","Watashi wa gohan o tabemasu.","Eu como."],
+    ["わたしはほんをよみます。","Watashi wa hon o yomimasu.","Eu leio um livro."],
+    ["わたしはてがみをかきます。","Watashi wa tegami o kakimasu.","Eu escrevo uma carta."],
+    ["わたしはおんがくをききます。","Watashi wa ongaku o kikimasu.","Eu escuto música."],
+    ["わたしはテレビをみます。","Watashi wa terebi o mimasu.","Eu assisto TV."],
+    ["わたしはにほんごをはなします。","Watashi wa nihongo o hanashimasu.","Eu falo japonês."],
+    ["わたしはうちへかえります。","Watashi wa uchi e kaerimasu.","Eu volto para casa."],
+    ["わたしはあさはやくおきます。","Watashi wa asa hayaku okimasu.","Eu acordo cedo de manhã."],
+    ["わたしはよるはやくねます。","Watashi wa yoru hayaku nemasu.","Eu durmo cedo à noite."],
+    ["わたしはまいにちはたらきます。","Watashi wa mainichi hatarakimasu.","Eu trabalho todos os dias."],
+    ["わたしはにほんごをべんきょうします。","Watashi wa nihongo o benkyou shimasu.","Eu estudo japonês."],
+    ["わたしはともだちとあそびます。","Watashi wa tomodachi to asobimasu.","Eu saio/brinco com amigos."],
+    ["わたしはくるまをうんてんします。","Watashi wa kuruma o unten shimasu.","Eu dirijo um carro."],
+    ["わたしはでんしゃにのります。","Watashi wa densha ni norimasu.","Eu pego o trem."],
+    ["わたしはくうこうへいきます。","Watashi wa kuukou e ikimasu.","Eu vou para o aeroporto."],
+    ["わたしはにほんへいきたいです。","Watashi wa nihon e ikitai desu.","Eu quero ir para o Japão."],
+    ["わたしはコーヒーがすきです。","Watashi wa koohii ga suki desu.","Eu gosto de café."],
+    ["わたしはさかながきらいです。","Watashi wa sakana ga kirai desu.","Eu não gosto de peixe."],
+    ["わたしはいぬをかっています。","Watashi wa inu o katte imasu.","Eu tenho (crio) um cachorro."],
+    ["わたしはギターをひきます。","Watashi wa gitaa o hikimasu.","Eu toco violão."],
+    ["わたしはスポーツをします。","Watashi wa supootsu o shimasu.","Eu pratico esportes."],
+    ["わたしはまいあさはしります。","Watashi wa maiasa hashirimasu.","Eu corro toda manhã."],
+    ["わたしはしごとをさがしています。","Watashi wa shigoto o sagashite imasu.","Eu estou procurando emprego."],
+    ["わたしはあたらしいくつをかいました。","Watashi wa atarashii kutsu o kaimashita.","Eu comprei sapatos novos."],
+    ["わたしはおかねをつかいます。","Watashi wa okane o tsukaimasu.","Eu gasto dinheiro."],
+    ["わたしはにもつをはこびます。","Watashi wa nimotsu o hakobimasu.","Eu carrego a bagagem."],
+    ["わたしはドアをあけます。","Watashi wa doa o akemasu.","Eu abro a porta."],
+    ["わたしはまどをしめます。","Watashi wa mado o shimemasu.","Eu fecho a janela."],
+    ["わたしはしゃしんをとります。","Watashi wa shashin o torimasu.","Eu tiro fotos."],
+    ["わたしはうたをうたいます。","Watashi wa uta o utaimasu.","Eu canto uma música."],
+    ["わたしはえをかきます。","Watashi wa e o kakimasu.","Eu desenho."],
+    ["わたしはりょうりをつくります。","Watashi wa ryouri o tsukurimasu.","Eu cozinho."],
+    ["わたしはへやをそうじします。","Watashi wa heya o souji shimasu.","Eu limpo o quarto."],
+    ["わたしはふくをあらいます。","Watashi wa fuku o araimasu.","Eu lavo roupa."],
+    ["わたしはでんわをかけます。","Watashi wa denwa o kakemasu.","Eu faço uma ligação."],
+    ["わたしはメールをおくります。","Watashi wa meeru o okurimasu.","Eu envio um e-mail."],
+    ["わたしはにほんごをおしえます。","Watashi wa nihongo o oshiemasu.","Eu ensino japonês."],
+    ["わたしはえいがをみにいきます。","Watashi wa eiga o mi ni ikimasu.","Eu vou assistir a um filme."],
+    ["わたしはかいものにいきます。","Watashi wa kaimono ni ikimasu.","Eu vou fazer compras."],
+    ["わたしはびょういんへいきます。","Watashi wa byouin e ikimasu.","Eu vou ao hospital."],
+    ["わたしはくすりをのみます。","Watashi wa kusuri o nomimasu.","Eu tomo remédio."],
+    ["わたしはたいしかんへいきます。","Watashi wa taishikan e ikimasu.","Eu vou à embaixada."],
+    ["わたしはしんぶんをよみます。","Watashi wa shinbun o yomimasu.","Eu leio o jornal."],
+    ["わたしはやくそくをまもります。","Watashi wa yakusoku o mamorimasu.","Eu cumpro uma promessa."],
+    ["わたしはもくひょうをたてます。","Watashi wa mokuhyou o tatemasu.","Eu estabeleço uma meta."],
+    ["わたしはれんしゅうをつづけます。","Watashi wa renshuu o tsuzukemasu.","Eu continuo praticando."],
+    ["わたしはかみさまにいのります。","Watashi wa kamisama ni inorimasu.","Eu rezo a Deus."],
+    ["わたしはゆめをあきらめません。","Watashi wa yume o akiramemasen.","Eu não desisto dos meus sonhos."]
+  ];
+
+  var SETS = { hiragana: HIRAGANA, katakana: KATAKANA, phrases: PHRASES };
+
+  // ---------- persistence ----------
+  var STORAGE_KEY = "kana_drill_stats_v1";
+  function loadStats(){
+    var s;
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) s = JSON.parse(raw);
+    }catch(e){}
+    s = s || {};
+    s.hiragana = s.hiragana || {};
+    s.katakana = s.katakana || {};
+    s.phrases = s.phrases || {};
+    return s;
+  }
+  function saveStats(stats){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(stats)); }catch(e){}
+  }
+  var stats = loadStats();
+
+  // ---------- state ----------
+  var currentSetName = null;
+  var currentSet = null;
+  var currentChar = null;   // [char, romaji]
+  var currentOptions = [];  // array of romaji strings
+  var correctIdx = 0;
+  var lastChar = null;
+  var isLocked = false;
+  var session = { correct: 0, total: 0, streak: 0 };
+
+  // ---------- elements ----------
+  var menuEl = document.getElementById("menu");
+  var gameEl = document.getElementById("game");
+  var kanaCharEl = document.getElementById("kana-char");
+  var kanaSubEl = document.getElementById("kana-sub");
+  var optionsEl = document.getElementById("options");
+  var optButtons = Array.prototype.slice.call(document.querySelectorAll(".opt"));
+  var flashEl = document.getElementById("flash");
+  var streakEl = document.getElementById("streak");
+  var accuracyEl = document.getElementById("accuracy");
+
+  // ---------- weighted pick ----------
+  function weightFor(setName, char){
+    var s = stats[setName][char];
+    var wrong = s ? s.wrong : 0;
+    return 1 + wrong * 2.5;
+  }
+
+  function pickChar(setName, set){
+    var weights = set.map(function(item){ return weightFor(setName, item[0]); });
+    var attempt = 0;
+    var pick;
+    do{
+      var total = weights.reduce(function(a,b){ return a+b; }, 0);
+      var r = Math.random() * total;
+      var acc = 0;
+      pick = set[set.length - 1];
+      for(var i=0; i<set.length; i++){
+        acc += weights[i];
+        if(r <= acc){ pick = set[i]; break; }
+      }
+      attempt++;
+    } while(pick[0] === lastChar && set.length > 1 && attempt < 6);
+    return pick;
+  }
+
+  // pega a "resposta" de um item: para kana é o romaji (índice 1),
+  // para frases é a tradução (último índice, já que o romaji fica no meio)
+  function answerOf(item){
+  return item[0];
+})();
+</script>
+</body>
+</html>
